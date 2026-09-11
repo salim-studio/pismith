@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pysmith"
+version = "0.2.0"
+description = "pysmith — langsmith-compatible observability/evaluation library, faster (local-first batch tracing, parallel evaluation)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []
+keywords = ["langsmith", "tracing", "evaluation", "llm", "observability", "fast"]
+
+[project.optional-dependencies]
+fast = ["orjson"]
+test = ["pytest"]
+all = ["orjson", "pytest"]
+
+[tool.setuptools.packages.find]
+include = ["pysmith*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Test & caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Env
+.venv/
+venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local runtime data (keep code, ignore local runs/feedback DBs)
+.pysmith/
+.pysmith_runs.jsonl
+*.jsonl
+*.db
