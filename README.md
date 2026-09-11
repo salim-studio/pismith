@@ -1,5 +1,11 @@
 # pysmith — بديل LangSmith الأسرع (محلي أولاً)
 
+```bash
+pip install git+https://github.com/salim-studio/pysmith.git
+# أو: pip install -e .  (من جذر المستودع)
+# للسرعة القصوى: pip install orjson
+```
+
 مكتبة مطابقة لواجهة `langsmith` ولكن أسرع: تتبع محلي batch + تقييم متوازٍ + صفر تكلفة عند التعطيل.
 
 ## لماذا أسرع؟
