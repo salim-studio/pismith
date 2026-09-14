@@ -1,10 +1,10 @@
-"""Tests for pysmith — المطابقة مع langsmith + السرعة."""
+"""Tests for pismith — langsmith compatibility + speed."""
 import asyncio
 import os
 import tempfile
 
-import pysmith as ps
-from pysmith import (Client, contains, evaluate, exact_match, trace,
+import pismith as ps
+from pismith import (Client, contains, evaluate, exact_match, trace,
                      traceable, tracing_context, get_current_run_tree, flush)
 
 
@@ -38,7 +38,7 @@ def test_trace_context_manager_and_tracing_context():
         return 1
 
     with tracing_context(enabled=False):
-        assert h() == 1  # بلا تسجيل، بلا خطأ
+        assert h() == 1  # no recording, no error
     assert h() == 1
 
 
@@ -56,7 +56,7 @@ def test_disabled_zero_overhead():
 def test_client_datasets_examples_feedback_runs():
     with tempfile.TemporaryDirectory() as d:
         store = os.path.join(d, "runs.jsonl")
-        os.environ["PYSMITH_STORE"] = store
+        os.environ["PISMITH_STORE"] = store
         try:
             c = Client(base_dir=os.path.join(d, "db"))
             c.create_dataset("ds", description="test")
@@ -71,7 +71,7 @@ def test_client_datasets_examples_feedback_runs():
             c.update_example(eid, metadata={"k": 1})
             assert c.read_example(eid)["metadata"] == {"k": 1}
 
-            # runs عبر traceable
+            # runs via traceable
             @traceable(name="r1")
             def f(x):
                 return x
@@ -86,8 +86,8 @@ def test_client_datasets_examples_feedback_runs():
             assert c.list_feedback([runs[-1]["id"]])
 
             # prompts hub
-            c.create_prompt("greet", "مرحبا {name}")
-            assert "مرحبا" in c.get_prompt("greet")["template"]
+            c.create_prompt("greet", "hello {name}")
+            assert "hello" in c.get_prompt("greet")["template"]
             assert c.list_prompts()
 
             # evaluate (sync + async)
@@ -100,7 +100,7 @@ def test_client_datasets_examples_feedback_runs():
                                            evaluators=[exact_match]))
             assert ares.summary["n"] == 2
 
-            # evaluators إضافية
+            # extra evaluators
             r2 = evaluate(lambda inp: "hello world", [{"inputs": {}, "outputs": {"output": "world"}}],
                           evaluators=[contains("output")])
             assert r2.summary["n"] == 1
@@ -111,11 +111,11 @@ def test_client_datasets_examples_feedback_runs():
             c.delete_dataset("ds")
             assert not c.has_dataset("ds")
         finally:
-            os.environ.pop("PYSMITH_STORE", None)
+            os.environ.pop("PISMITH_STORE", None)
 
 
 def test_langsmith_api_parity_names():
-    # أهم أسماء langsmith موجودة في pysmith.Client
+    # key langsmith names exist on pismith.Client
     for m in ["create_dataset", "read_dataset", "has_dataset", "list_datasets",
               "delete_dataset", "create_example", "create_examples",
               "read_example", "list_examples", "update_example", "delete_example",

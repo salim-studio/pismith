@@ -21,7 +21,12 @@ venv/
 Thumbs.db
 
 # Local runtime data (keep code, ignore local runs/feedback DBs)
+.pismith/
+.pismith_runs.jsonl
+.pismith_experiments/
+# legacy pysmith artifacts (pre-rename)
 .pysmith/
 .pysmith_runs.jsonl
+.pysmith_experiments/
 *.jsonl
 *.db

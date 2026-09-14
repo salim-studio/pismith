@@ -1,4 +1,4 @@
-"""Benchmark: pysmith سرعة التتبع والتقييم (يعمل بـ python benchmarks/bench_pysmith.py)."""
+"""Benchmark: pismith tracing + evaluation speed (run: python benchmarks/bench_pismith.py)."""
 import os
 import sys
 import tempfile
@@ -6,19 +6,19 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-os.environ["PYSMITH_STORE"] = os.path.join(tempfile.gettempdir(), "bench_pysmith.jsonl")
+os.environ["PISMITH_STORE"] = os.path.join(tempfile.gettempdir(), "bench_pismith.jsonl")
 try:
-    os.remove(os.environ["PYSMITH_STORE"])
+    os.remove(os.environ["PISMITH_STORE"])
 except OSError:
     pass
 
-from pysmith import Client, evaluate, flush, traceable
+from pismith import Client, evaluate, flush, traceable
 
 
 def bench_disabled(n=20000):
-    os.environ["PYSMITH_TRACING"] = "false"
+    os.environ["PISMITH_TRACING"] = "false"
     import importlib
-    import pysmith.tracing as t
+    import pismith.tracing as t
     t.set_enabled(False)
 
     @traceable(name="b")
@@ -34,7 +34,7 @@ def bench_disabled(n=20000):
 
 
 def bench_enabled(n=5000):
-    from pysmith import tracing as t
+    from pismith import tracing as t
     t.set_enabled(True)
 
     @traceable(name="bench")
@@ -46,7 +46,7 @@ def bench_enabled(n=5000):
         f(i)
     flush()
     dt = time.perf_counter() - t0
-    size = os.path.getsize(os.environ["PYSMITH_STORE"])
+    size = os.path.getsize(os.environ["PISMITH_STORE"])
     print(f"enabled+batch-write: {n} runs in {dt:.3f}s → {n/dt:,.0f} run/s (file {size/1024:.1f} KB)")
 
 

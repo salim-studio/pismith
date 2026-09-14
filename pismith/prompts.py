@@ -1,4 +1,4 @@
-"""Prompts hub محلي — مطابق لسطح langsmith prompts (create/get/list)."""
+"""Local prompts hub — langsmith prompts-compatible surface (create/get/list)."""
 from __future__ import annotations
 
 import os
@@ -30,7 +30,7 @@ def _save(base_dir: str, d: dict):
     os.replace(tmp, _path(base_dir))
 
 
-def create_prompt(name: str, template: str, base_dir: str = ".pysmith",
+def create_prompt(name: str, template: str, base_dir: str = ".pismith",
                   variables: list | None = None) -> dict:
     d = _load(base_dir)
     hist = d.get(name, [])
@@ -43,7 +43,7 @@ def create_prompt(name: str, template: str, base_dir: str = ".pysmith",
     return dict(entry)
 
 
-def get_prompt(name: str, base_dir: str = ".pysmith", commit: str | None = None) -> dict:
+def get_prompt(name: str, base_dir: str = ".pismith", commit: str | None = None) -> dict:
     hist = _load(base_dir).get(name, [])
     if not hist:
         raise KeyError(f"prompt not found: {name}")
@@ -55,13 +55,13 @@ def get_prompt(name: str, base_dir: str = ".pysmith", commit: str | None = None)
     return dict(hist[-1])
 
 
-def list_prompts(base_dir: str = ".pysmith", limit: int = 50) -> list[dict]:
+def list_prompts(base_dir: str = ".pismith", limit: int = 50) -> list[dict]:
     d = _load(base_dir)
     out = [v[-1] for v in d.values() if v]
     return [dict(e) for e in out[:limit]]
 
 
-def format_prompt(name: str, base_dir: str = ".pysmith", **vars) -> str:
+def format_prompt(name: str, base_dir: str = ".pismith", **vars) -> str:
     p = get_prompt(name, base_dir)
     t = p["template"]
     try:

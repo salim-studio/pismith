@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="pismith logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#232847"/>
+      <stop offset="1" stop-color="#12152B"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="none" stroke="#F59E0B" stroke-width="7"/>
+  <!-- glowing pi: the raw material -->
+  <text x="128" y="158" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="124" fill="#FFFFFF">&#960;</text>
+  <!-- the anvil bar: the forge -->
+  <rect x="58" y="172" width="140" height="14" rx="7" fill="url(#hot)"/>
+  <!-- sparks -->
+  <path d="M196 52 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 z" fill="#FCD34D"/>
+  <circle cx="62" cy="66" r="6" fill="#F59E0B"/>
+  <circle cx="82" cy="46" r="3.5" fill="#FCD34D"/>
+</svg>

@@ -1,4 +1,4 @@
-"""Schemas — مطابقة لـ langsmith.schemas (نسخة خفيفة بـ dataclasses + slots)."""
+"""Schemas — langsmith.schemas compatible (lightweight dataclasses + slots)."""
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field

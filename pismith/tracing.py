@@ -1,18 +1,21 @@
-"""Tracing — مطابق لـ langsmith.run_helpers (محلي أولاً + أسرع).
+"""Tracing — langsmith.run_helpers compatible (local-first + faster).
 
-لماذا أسرع من langsmith؟
-- مسار `PYSMITH_TRACING=false` تكلفته ~صفر (فحص bool واحد، بلا objects).
-- كاتب خلفية واحد batch (queue + thread واحد) بدل POST لكل run.
-- تسلسل محدود الحجم `_safe` (قص + عمق محدود) + orjson إن وُجد.
-- sampling عبر `PYSMITH_SAMPLE=0.1` لتتبع 10% فقط في الإنتاج.
-- لا حجب شبكي أبداً: endpoint اختياري best-effort بمهلة 2s في الخلفية.
+Why faster than langsmith?
+- `PISMITH_TRACING=false` costs ~zero (a single bool check, no objects).
+- One background batch writer (queue + single thread) instead of POST per run.
+- Bounded `_safe` serialization (truncation + depth limit) + orjson when available.
+- Sampling via `PISMITH_SAMPLE=0.1` to trace only 10% in production.
+- Never blocks on network: optional best-effort endpoint with 2s timeout, in background.
 
-واجهة مطابقة:
+Matching interface:
 - @traceable / @trace
-- trace(name=...) كـ context manager
+- trace(name=...) as a context manager
 - tracing_context(enabled=..., tags=..., metadata=...)
 - get_current_run_tree / current_run
-- RunTree (متوافق اسمياً مع langsmith RunTree)
+- RunTree (name-compatible with langsmith RunTree)
+
+Environment (new `PISMITH_*` names take precedence, legacy `PYSMITH_*` still honored):
+- PISMITH_TRACING / PISMITH_STORE / PISMITH_BATCH / PISMITH_SAMPLE / PISMITH_ENDPOINT
 """
 from __future__ import annotations
 
@@ -20,39 +23,47 @@ import contextlib
 import contextvars
 import functools
 import inspect
-import os
 import queue
 import threading
 import time
 
-from ._utils import fast_dumps, new_id, sample_hit
+from ._utils import fast_dumps, getenv, new_id, sample_hit
 
-_ENABLED = os.environ.get("PYSMITH_TRACING", "true").lower() not in ("0", "false", "off", "no", "n")
+_ENABLED = getenv("PISMITH_TRACING", "PYSMITH_TRACING", default="true").lower() not in ("0", "false", "off", "no", "n")
+
+
 def _store_path() -> str:
-    return os.environ.get("PYSMITH_STORE", ".pysmith_runs.jsonl")
+    return getenv("PISMITH_STORE", "PYSMITH_STORE", default=".pismith_runs.jsonl")
 
 
 def _batch_n() -> int:
     try:
-        return int(os.environ.get("PYSMITH_BATCH", "100") or 100)
+        return int(getenv("PISMITH_BATCH", "PYSMITH_BATCH", default="100") or 100)
     except Exception:
         return 100
 
 
 def _sample_rate() -> float:
     try:
-        return float(os.environ.get("PYSMITH_SAMPLE", "1.0") or 1.0)
+        return float(getenv("PISMITH_SAMPLE", "PYSMITH_SAMPLE", default="1.0") or 1.0)
     except Exception:
         return 1.0
 
-_STORE = os.environ.get("PYSMITH_STORE", ".pysmith_runs.jsonl")
-_SAMPLE = float(os.environ.get("PYSMITH_SAMPLE", "1.0") or 1.0)
-_BATCH = int(os.environ.get("PYSMITH_BATCH", "100") or 100)
 
-_current: contextvars.ContextVar = contextvars.ContextVar("pysmith_run", default=None)
-_tags_ctx: contextvars.ContextVar = contextvars.ContextVar("pysmith_tags", default=None)
-_meta_ctx: contextvars.ContextVar = contextvars.ContextVar("pysmith_meta", default=None)
-_enabled_ctx: contextvars.ContextVar = contextvars.ContextVar("pysmith_enabled", default=None)
+_CURRENT_ATTR = "__pismith_traceable__"
+_LEGACY_ATTR = "__pysmith_traceable__"  # accepted for backward compatibility
+
+
+def _mark_traceable(fn):
+    setattr(fn, _CURRENT_ATTR, True)
+    setattr(fn, _LEGACY_ATTR, True)  # so old detectors keep working
+    return fn
+
+
+_current: contextvars.ContextVar = contextvars.ContextVar("pismith_run", default=None)
+_tags_ctx: contextvars.ContextVar = contextvars.ContextVar("pismith_tags", default=None)
+_meta_ctx: contextvars.ContextVar = contextvars.ContextVar("pismith_meta", default=None)
+_enabled_ctx: contextvars.ContextVar = contextvars.ContextVar("pismith_enabled", default=None)
 
 _Q: queue.Queue = queue.Queue(maxsize=20000)
 _worker_started = False
@@ -75,7 +86,7 @@ def current_run():
     return _current.get()
 
 
-get_current_run_tree = current_run  # alias مطابق لـ langsmith
+get_current_run_tree = current_run  # alias matching langsmith
 
 
 def get_tracing_context() -> dict:
@@ -86,7 +97,7 @@ def get_tracing_context() -> dict:
 @contextlib.contextmanager
 def tracing_context(*, enabled: bool | None = None, tags: list | None = None,
                     metadata: dict | None = None):
-    """مطابق لـ langsmith.tracing_context — يعطّل/يوسم مقطعاً كاملاً."""
+    """Match langsmith.tracing_context — disable/tag a whole section."""
     t1 = _enabled_ctx.set(enabled) if enabled is not None else None
     t2 = _tags_ctx.set(tags) if tags is not None else None
     t3 = _meta_ctx.set(metadata) if metadata is not None else None
@@ -117,7 +128,7 @@ def set_run_metadata(metadata: dict):
 
 
 def is_traceable_function(fn) -> bool:
-    return bool(getattr(fn, "__pysmith_traceable__", False))
+    return bool(getattr(fn, _CURRENT_ATTR, False) or getattr(fn, _LEGACY_ATTR, False))
 
 
 def ensure_traceable(fn, **kw):
@@ -127,7 +138,8 @@ def ensure_traceable(fn, **kw):
 
 
 def _safe(x, depth: int = 0):
-    # تسلسل سريع محدود: يمنع انفجار الذاكرة مع LangChain messages الكبيرة
+    # Fast bounded serialization: prevents memory blowups on large inputs
+    # (e.g. LangChain messages)
     if x is None or isinstance(x, (bool, int, float)):
         return x
     if isinstance(x, str):
@@ -146,7 +158,7 @@ def _safe(x, depth: int = 0):
         return out
     if isinstance(x, (list, tuple)):
         return [_safe(v, depth + 1) for v in list(x)[:20]]
-    if hasattr(x, "content"):  # BaseMessage من langchain
+    if hasattr(x, "content"):  # BaseMessage from langchain
         try:
             return _safe(str(x.content)[:2000], depth + 1)
         except Exception:
@@ -164,7 +176,7 @@ def _safe(x, depth: int = 0):
 
 
 class Run:
-    """Run خفيف بـ __slots__ (أسرع إنشاءً من pydantic)."""
+    """Lightweight Run with __slots__ (faster to create than pydantic)."""
     __slots__ = ("id", "name", "run_type", "inputs", "outputs", "error",
                  "start", "end", "parent_id", "tags", "metadata", "children",
                  "feedback", "_events")
@@ -207,7 +219,7 @@ class Run:
 
 
 class RunTree(Run):
-    """متوافق اسمياً مع langsmith RunTree: create_child + post/patch محلية."""
+    """Name-compatible with langsmith RunTree: create_child + local post/patch."""
 
     def create_child(self, name: str, inputs=None, run_type: str = "chain",
                      tags: list | None = None, metadata: dict | None = None) -> "RunTree":
@@ -234,9 +246,9 @@ get_run_tree_context = current_run
 
 
 class trace:
-    """مطابق لـ langsmith.run_helpers.trace — يُستعمل decorator أو context manager.
+    """Match langsmith.run_helpers.trace — usable as decorator or context manager.
 
-    @trace(name="step")  أو  with trace(name="step", inputs={...}) as run:
+    @trace(name="step")  or  with trace(name="step", inputs={...}) as run:
     """
 
     def __init__(self, func=None, *, name: str | None = None,
@@ -251,11 +263,11 @@ class trace:
         self._run: Run | None = None
 
     def __call__(self, *a, **k):
-        if self._func is not None:  # استُعمل كـ @trace بلا أقواس
+        if self._func is not None:  # used as bare @trace
             deco = traceable(self._func, name=self._name, run_type=self._run_type,
                              tags=self._tags, metadata=self._metadata)
             return deco(*a, **k)
-        # استُعمل كـ @trace(name=...) → أعد decorator
+        # used as @trace(name=...) -> return a decorator
         fn = a[0] if a else None
         if callable(fn) and not k:
             return traceable(fn, name=self._name, run_type=self._run_type,
@@ -286,7 +298,7 @@ class trace:
         return False
 
 
-# --- الخلفية: كاتب batch واحد ---
+# --- Background: a single batch writer ---
 
 def _ensure_worker():
     global _worker_started
@@ -296,7 +308,7 @@ def _ensure_worker():
         if _worker_started:
             return
         _worker_started = True
-        t = threading.Thread(target=_worker, daemon=True, name="pysmith-writer")
+        t = threading.Thread(target=_worker, daemon=True, name="pismith-writer")
         t.start()
 
 
@@ -335,8 +347,8 @@ def _flush(buf: list[dict]):
                 f.write(fast_dumps(r) + "\n")
     except Exception:
         pass
-    ep = os.environ.get("PYSMITH_ENDPOINT", "")
-    if ep:  # best-effort لا يحجب أبداً
+    ep = getenv("PISMITH_ENDPOINT", "PYSMITH_ENDPOINT")
+    if ep:  # best-effort, never blocks
         try:
             import urllib.request
             body = fast_dumps(buf).encode()
@@ -371,7 +383,7 @@ def _event(kind: str, name: str, data=None):
 
 
 def flush():
-    """انتظار تفريغ الطابور (يُستدعى قبل الخروج/الاختبارات)."""
+    """Wait for the queue to drain (call before exit/tests)."""
     if not is_enabled():
         return
     try:
@@ -385,7 +397,7 @@ def flush():
 
 def traceable(func=None, *, name: str | None = None, run_type: str = "chain",
               tags: list | None = None, metadata: dict | None = None):
-    """مزخرف مطابق لـ langsmith @traceable. صفر تكلفة تقريباً عند التعطيل."""
+    """Decorator matching langsmith @traceable. Near-zero cost when disabled."""
     def deco(fn):
         fname = name or fn.__name__
         if inspect.iscoroutinefunction(fn):
@@ -411,7 +423,7 @@ def traceable(func=None, *, name: str | None = None, run_type: str = "chain",
                         parent.children.append(run)
                     else:
                         _log_run(run)
-            aw.__pysmith_traceable__ = True
+            _mark_traceable(aw)
             return aw
 
         if inspect.isgeneratorfunction(fn):
@@ -438,7 +450,7 @@ def traceable(func=None, *, name: str | None = None, run_type: str = "chain",
                         parent.children.append(run)
                     else:
                         _log_run(run)
-            gw.__pysmith_traceable__ = True
+            _mark_traceable(gw)
             return gw
 
         @functools.wraps(fn)
@@ -465,7 +477,7 @@ def traceable(func=None, *, name: str | None = None, run_type: str = "chain",
                     parent.children.append(run)
                 else:
                     _log_run(run)
-        w.__pysmith_traceable__ = True
+        _mark_traceable(w)
         return w
     return deco(func) if func else deco
 

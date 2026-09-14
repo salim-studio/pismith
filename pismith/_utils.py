@@ -1,12 +1,13 @@
-"""أدوات داخلية سريعة لـ pysmith: توليد ids + تسلسل JSON سريع + وقت."""
+"""Fast internal utilities for pismith: ids, fast JSON, env, time."""
 from __future__ import annotations
 
 import json
+import os
 import random
 import time
 import uuid
 
-try:  # orjson أسرع ~5-10x إن وُجد، وإلا stdlib
+try:  # orjson is ~5-10x faster when available, stdlib otherwise
     import orjson as _orjson
 
     def fast_dumps(obj) -> str:
@@ -42,4 +43,18 @@ def sample_hit(rate: float) -> bool:
     return random.random() < rate
 
 
-__all__ = ["fast_dumps", "fast_loads", "FAST_JSON", "new_id", "utcnow", "sample_hit"]
+def getenv(*names: str, default: str = "") -> str:
+    """First non-empty env var wins.
+
+    pismith reads ``PISMITH_*`` first and falls back to legacy ``PYSMITH_*``,
+    so renaming the library never breaks existing deployments.
+    """
+    for n in names:
+        v = os.environ.get(n)
+        if v not in (None, ""):
+            return v
+    return default
+
+
+__all__ = ["fast_dumps", "fast_loads", "FAST_JSON", "new_id", "utcnow",
+           "sample_hit", "getenv"]

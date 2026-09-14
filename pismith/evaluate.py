@@ -1,9 +1,9 @@
-"""Evaluate — مطابق لـ langsmith.evaluate (متوازٍ + أسرع).
+"""Evaluate — langsmith.evaluate compatible (parallel + faster).
 
-السرعة:
-- ThreadPoolExecutor متوازٍ (I/O-bound: استدعاءات LLM)
-- دعم async عبر aevaluate (asyncio.gather + Semaphore)
-- ملخص إحصائي واحد (avg/p50/p95 + متوسط كل score)
+Speed:
+- Parallel ThreadPoolExecutor (I/O-bound: LLM calls)
+- Async support via aevaluate (asyncio.gather + Semaphore)
+- A single stats summary (avg/p50/p95 + mean of each score)
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def _resolve_examples(dataset, client) -> list[dict]:
 def evaluate(target, dataset=None, evaluators: list | None = None,
              experiment: str = "exp-1", max_workers: int = 8,
              client=None, **kw) -> ExperimentResults:
-    """target: دالة(inputs)->outputs. dataset: اسم أو قائمة أمثلة."""
+    """target: fn(inputs)->outputs. dataset: name or list of examples."""
     examples = _resolve_examples(dataset, client)
     if not examples:
         return ExperimentResults(experiment, [])
@@ -103,7 +103,7 @@ def evaluate(target, dataset=None, evaluators: list | None = None,
     with ThreadPoolExecutor(max_workers=n) as ex:
         results = list(ex.map(lambda e: _run_one(target, evaluators, e), examples))
     res = ExperimentResults(experiment, results)
-    # سجّل التجربة كـ feedback/run محلي اختياري
+    # optionally record the experiment as local feedback/runs
     if client is not None and kw.get("log", False):
         for r in results:
             try:
@@ -117,7 +117,7 @@ def evaluate(target, dataset=None, evaluators: list | None = None,
 async def aevaluate(target, dataset=None, evaluators: list | None = None,
                     experiment: str = "exp-1", max_concurrency: int = 8,
                     client=None, **kw) -> ExperimentResults:
-    """نسخة async مطابقة لـ langsmith.aevaluate."""
+    """Async variant matching langsmith.aevaluate."""
     examples = _resolve_examples(dataset, client)
     sem = asyncio.Semaphore(max(1, max_concurrency))
 
@@ -142,14 +142,14 @@ async def aevaluate(target, dataset=None, evaluators: list | None = None,
 
 
 def evaluate_run(run: dict, evaluators: list | None = None) -> dict:
-    """قيّم run واحداً جاهزاً (مطابق لـ langsmith.evaluate_run)."""
+    """Score one finished run (matches langsmith.evaluate_run)."""
     example = {"inputs": run.get("inputs"), "outputs": run.get("outputs"),
                "id": run.get("id")}
     return {"run_id": run.get("id"),
             "scores": _score_one(evaluators, example, run.get("outputs"))}
 
 
-# ---------- مقيّمات جاهزة (مطابقة evaluators في langsmith) ----------
+# ---------- ready-made evaluators (matching langsmith evaluators) ----------
 
 def exact_match(example: dict, outputs) -> dict:
     exp = example.get("outputs")
@@ -184,7 +184,7 @@ def regex_match(pattern: str, key: str = "output"):
 
 
 def score_string(expected: str, key: str = "output"):
-    """مطابق تقريبي: 1.0 تطابق، 0.5 احتواء، 0.0 غير ذلك."""
+    """Fuzzy match: 1.0 exact, 0.5 contains, 0.0 otherwise."""
     def _ev(example: dict, outputs) -> dict:
         got = outputs.get(key, outputs) if isinstance(outputs, dict) else outputs
         g, e = str(got or "").strip(), str(expected).strip()

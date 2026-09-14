@@ -1,16 +1,16 @@
-"""Client — مطابق لسطح langsmith.Client (محلي أولاً: JSON + بحث سريع).
+"""Client — langsmith.Client-compatible surface (local-first: JSON + fast lookup).
 
-التخزين المحلي:
-  .pysmith/datasets.json   → datasets + examples
-  .pysmith_runs.jsonl      → runs (عبر tracing)
-  .pysmith/feedback.jsonl  → feedback
-  .pysmith/prompts.json    → prompts hub
+Local storage:
+  .pismith/datasets.json   → datasets + examples
+  .pismith_runs.jsonl      → runs (via tracing)
+  .pismith/feedback.jsonl  → feedback
+  .pismith/prompts.json    → prompts hub
 
-السرعة:
-- cache داخل-الذاكرة + كتابة ذرّية (tmp + os.replace)
-- RLock واحد بدل قفل شبكي
-- list_runs يقرأ آخر N سطر فقط (لا يحمّل الملف كله)
-- batch_ingest_runs يكتب دفعة واحدة
+Speed:
+- in-memory cache + atomic writes (tmp + os.replace)
+- a single RLock instead of network locking
+- list_runs reads only the last N lines (never loads the whole file)
+- batch_ingest_runs writes in one batch
 """
 from __future__ import annotations
 
@@ -19,16 +19,18 @@ import time
 from collections import deque
 from threading import RLock
 
-from ._utils import fast_dumps, fast_loads, new_id
+from ._utils import fast_dumps, fast_loads, getenv, new_id
 from .schemas import Dataset
 
 
 class Client:
-    def __init__(self, base_dir: str = ".pysmith", api_key: str | None = None,
+    def __init__(self, base_dir: str = ".pismith", api_key: str | None = None,
                  endpoint: str | None = None, api_url: str | None = None):
         self.base_dir = base_dir
-        self.api_key = api_key or os.environ.get("PYSMITH_API_KEY", "") or os.environ.get("LANGSMITH_API_KEY", "")
-        self.endpoint = (endpoint or api_url or os.environ.get("PYSMITH_ENDPOINT", "")).rstrip("/")
+        self.api_key = api_key or getenv("PISMITH_API_KEY", "PYSMITH_API_KEY",
+                                         "LANGSMITH_API_KEY")
+        self.endpoint = (endpoint or api_url
+                         or getenv("PISMITH_ENDPOINT", "PYSMITH_ENDPOINT")).rstrip("/")
         self.api_url = self.endpoint
         self._lock = RLock()
         os.makedirs(base_dir, exist_ok=True)
@@ -58,9 +60,9 @@ class Client:
         os.replace(tmp, self._ds_path)
 
     def _runs_path(self) -> str:
-        return os.environ.get("PYSMITH_STORE", ".pysmith_runs.jsonl")
+        return getenv("PISMITH_STORE", "PYSMITH_STORE", default=".pismith_runs.jsonl")
 
-    # ---------- datasets (مطابق langsmith) ----------
+    # ---------- datasets (langsmith-compatible) ----------
     def create_dataset(self, dataset_name: str, description: str = "",
                        data_type: str = "kv", **kw) -> dict:
         name = dataset_name
@@ -103,7 +105,7 @@ class Client:
                         break
             self._save_ds(d)
 
-    # alias لمشاريع langsmith (نعامل project كـ dataset group محلياً)
+    # langsmith projects alias (a local project behaves like a dataset group)
     create_project = create_dataset
     read_project = read_dataset
     has_project = has_dataset
@@ -119,7 +121,7 @@ class Client:
                                       "metadata": metadata or {}}])[0]
 
     def create_examples(self, dataset_name: str, examples: list[dict]) -> list[dict]:
-        """examples: [{inputs, outputs?, metadata?, id?}] — يقبل dataset_id أيضاً."""
+        """examples: [{inputs, outputs?, metadata?, id?}] — also accepts a dataset_id."""
         with self._lock:
             d = dict(self._load_ds())
             ds = d.get(dataset_name)
@@ -145,7 +147,7 @@ class Client:
             self._save_ds(d)
             return out
 
-    # توافقية: create_example_from_run / create_llm_example / create_chat_example
+    # compat: create_example_from_run / create_llm_example / create_chat_example
     def create_example_from_run(self, run: dict, dataset_name: str, **kw) -> dict:
         return self.create_example(run.get("inputs") or {}, run.get("outputs"),
                                    dataset_name=dataset_name)[0] if False else \
@@ -226,7 +228,7 @@ class Client:
         path = self._runs_path()
         if not os.path.exists(path):
             return []
-        # قراءة آخر N سطر بكفاءة: tail عبر deque
+        # efficiently read the last N lines: tail via deque
         with open(path, encoding="utf-8") as f:
             lines = deque(f, maxlen=limit)
         out = []
@@ -247,7 +249,7 @@ class Client:
             runs = [r for r in runs if r.get("run_type") == run_type]
         return runs[-limit:]
 
-    runs = None  # سيُضبط أدناه كـ property-ish؟ نُبقي list_runs الأساس
+    runs = None  # kept as list_runs below; langsmith exposes .runs as a namespace
 
     def read_run(self, run_id: str) -> dict:
         for r in self._iter_run_lines(5000):
@@ -278,7 +280,7 @@ class Client:
 
     def get_run_url(self, run: dict | str) -> str:
         rid = run.get("id") if isinstance(run, dict) else run
-        return f"pysmith://run/{rid}"
+        return f"pismith://run/{rid}"
 
     def get_run_stats(self, **kw) -> dict:
         runs = self.list_runs(limit=kw.get("limit", 200))
@@ -327,7 +329,7 @@ class Client:
                 for fb in kept:
                     f.write(fast_dumps(fb) + "\n")
 
-    # ---------- evaluate shortcuts (مطابقة langsmith.Client.evaluate) ----------
+    # ---------- evaluate shortcuts (matching langsmith.Client.evaluate) ----------
     def evaluate(self, target, dataset: str | list, evaluators: list | None = None,
                  experiment: str = "exp-1", **kw):
         from .evaluate import evaluate as _ev
@@ -337,7 +339,7 @@ class Client:
         from .evaluate import aevaluate as _aev
         return _aev(*a, **k, client=self)
 
-    # ---------- prompts hub (محلي) ----------
+    # ---------- local prompts hub ----------
     def create_prompt(self, name: str, template: str, **kw) -> dict:
         from .prompts import create_prompt as _cp
         return _cp(name, template, base_dir=self.base_dir)
@@ -362,9 +364,9 @@ class Client:
     def close(self):
         self.flush()
 
-    # ---------- متفرقات للتوافق ----------
+    # ---------- misc compat ----------
     def info(self) -> dict:
-        return {"backend": "pysmith-local", "base_dir": self.base_dir,
+        return {"backend": "pismith-local", "base_dir": self.base_dir,
                 "datasets": len(self._load_ds())}
 
     @property
@@ -372,8 +374,8 @@ class Client:
         return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
 
-# إصلاح: langsmith لديه خاصية .runs كـ namespace؛ نُبقي list_runs فقط
-# (حذفنا runs=None حتى لا نكسر dir(Client))
+# note: langsmith exposes .runs as a namespace; we keep list_runs only
+# (runs=None is deleted so dir(Client) stays clean)
 delattr(Client, "runs")
 
 __all__ = ["Client"]

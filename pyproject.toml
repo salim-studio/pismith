@@ -3,14 +3,20 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pysmith"
-version = "0.2.0"
-description = "pysmith — langsmith-compatible observability/evaluation library, faster (local-first batch tracing, parallel evaluation)"
+name = "pismith"
+version = "0.3.0"
+description = "pismith — all-in-one toolkit: databases + data analysis + ML/DL experiments + LLM observability (langsmith-compatible, local-first, zero required deps)"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
+authors = [{ name = "salim-studio" }]
 dependencies = []
-keywords = ["langsmith", "tracing", "evaluation", "llm", "observability", "fast"]
+keywords = ["langsmith", "tracing", "evaluation", "llm", "observability", "fast", "database", "sqlite", "postgres", "data-analysis", "pandas", "machine-learning", "deep-learning", "mlflow", "etl", "metrics"]
+
+[project.urls]
+Homepage = "https://github.com/salim-studio/pismith"
+Repository = "https://github.com/salim-studio/pismith"
+Issues = "https://github.com/salim-studio/pismith/issues"
 
 [project.optional-dependencies]
 fast = ["orjson"]
@@ -18,7 +24,7 @@ test = ["pytest"]
 all = ["orjson", "pytest"]
 
 [tool.setuptools.packages.find]
-include = ["pysmith*"]
+include = ["pismith*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" role="img" aria-label="pismith banner">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#232847"/>
+      <stop offset="1" stop-color="#0E1122"/>
+    </linearGradient>
+    <linearGradient id="hot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="420" fill="url(#bg)"/>
+  <rect x="14" y="14" width="1252" height="392" rx="28" fill="none" stroke="#F59E0B" stroke-width="3" opacity="0.55"/>
+
+  <!-- mark -->
+  <g transform="translate(110,82)">
+    <rect width="256" height="256" rx="56" fill="#161A30" stroke="#F59E0B" stroke-width="7"/>
+    <text x="128" y="158" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="124" fill="#FFFFFF">&#960;</text>
+    <rect x="58" y="172" width="140" height="14" rx="7" fill="url(#hot)"/>
+    <path d="M196 52 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 z" fill="#FCD34D"/>
+    <circle cx="62" cy="66" r="6" fill="#F59E0B"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="410" y="200" font-family="Verdana, Geneva, sans-serif" font-weight="bold" font-size="112" letter-spacing="2" fill="#FFFFFF">pismith</text>
+  <text x="412" y="252" font-family="Verdana, Geneva, sans-serif" font-size="34" fill="#C7CDF5">Forge raw data into products.</text>
+
+  <!-- pills -->
+  <g font-family="Verdana, Geneva, sans-serif" font-size="24" font-weight="bold">
+    <rect x="412" y="284" width="172" height="52" rx="26" fill="none" stroke="#F59E0B" stroke-width="2.5"/>
+    <text x="498" y="319" text-anchor="middle" fill="#FCD34D">DATABASES</text>
+    <rect x="600" y="284" width="104" height="52" rx="26" fill="none" stroke="#F59E0B" stroke-width="2.5"/>
+    <text x="652" y="319" text-anchor="middle" fill="#FCD34D">DATA</text>
+    <rect x="720" y="284" width="140" height="52" rx="26" fill="none" stroke="#F59E0B" stroke-width="2.5"/>
+    <text x="790" y="319" text-anchor="middle" fill="#FCD34D">ML &#183; DL</text>
+    <rect x="876" y="284" width="92" height="52" rx="26" fill="none" stroke="#F59E0B" stroke-width="2.5"/>
+    <text x="922" y="319" text-anchor="middle" fill="#FCD34D">LLM</text>
+  </g>
+</svg>
