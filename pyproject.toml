@@ -9,7 +9,8 @@ description = "pismith — all-in-one toolkit: databases + data analysis + ML/DL
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "salim-studio" }]
+authors = [{ name = "salim-slimani", email = "slimanisalim.eco@gmail.com" }]
+maintainers = [{ name = "salim-slimani", email = "slimanisalim.eco@gmail.com" }]
 dependencies = []
 keywords = ["langsmith", "tracing", "evaluation", "llm", "observability", "fast", "database", "sqlite", "postgres", "data-analysis", "pandas", "machine-learning", "deep-learning", "mlflow", "etl", "metrics"]
 

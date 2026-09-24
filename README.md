@@ -160,5 +160,5 @@ Please keep the core dependency-free: optional integrations must degrade gracefu
 
 ## License
 
-MIT © 2026 [salim-studio](https://github.com/salim-studio) — see [LICENSE](LICENSE).
+Copyright (c) 2026 salim-slimani — MIT License. See [LICENSE](LICENSE).
 Formerly `pysmith`; renamed to `pismith` at v0.3.0 (history preserved).

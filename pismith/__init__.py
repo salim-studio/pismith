@@ -1,3 +1,4 @@
+# Copyright (c) 2026 salim-slimani — MIT License
 """pismith — the toolkit for developers, analysts & data scientists (local-first).
 
     # LLM observability (langsmith-compatible)
